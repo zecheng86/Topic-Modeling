@@ -1,0 +1,70 @@
+---
+title: "Untitled"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-11-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+movies<-read.csv("movie_plots_with_genres.csv")
+library(dplyr)
+library(janeaustenr)
+library(tidytext)
+library(topicmodels)
+library(tidyr)
+library(factoextra)
+data("stop_words")
+movie_words <- movies |> unnest_tokens(word, Plot)
+movie_counts <- movie_words %>%
+  anti_join(stop_words) %>%
+  count(Movie.Name, word, sort = TRUE)
+```
+
+Weeding out the names, reorganize the data:
+```{r}
+library(lexicon)
+data("freq_first_names")
+firstname <- tolower(freq_first_names$Name)
+movie_counts <- movie_counts |> filter(!(word %in% firstname))
+```
+
+Casting the words counts to a matrix
+```{r}
+counts_matrix<-movie_counts |> cast_dtm(Movie.Name,word,n)
+```
+
+
+
+```{r}
+example <- head(counts_matrix, n=6)
+print(example)
+dim(movie_counts)
+dim(movies)
+lda <- LDA(counts_matrix, k = 30, control = list(seed = 1066))
+plots_gamma <- tidy(lda, matrix = "gamma") %>%
+  pivot_wider(names_from = topic, values_from = gamma) %>%
+  drop_na()
+cluster <- kmeans(select(plots_gamma, -document), centers = 8, nstart = 25)
+fviz_cluster(cluster, data = select(plots_gamma, -document), geom = "point")
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
